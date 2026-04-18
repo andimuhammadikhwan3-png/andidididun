@@ -27,8 +27,18 @@ import {
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
-// Initialization for Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialization helper for Gemini to handle missing keys gracefully
+let genAI: GoogleGenAI | null = null;
+const getGenAI = () => {
+  if (!genAI) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      return null;
+    }
+    genAI = new GoogleGenAI({ apiKey });
+  }
+  return genAI;
+};
 
 // --- Components ---
 
@@ -283,7 +293,12 @@ const AIChat = () => {
     setLoading(true);
 
     try {
-      const result = await ai.models.generateContent({
+      const aiInstance = getGenAI();
+      if (!aiInstance) {
+        throw new Error("API Key Gemini belum dikonfigurasi. Silakan tambahkan di Secrets.");
+      }
+
+      const result = await aiInstance.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: userMsg,
         config: {
@@ -295,7 +310,8 @@ const AIChat = () => {
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'ai', text: "Waduh, koneksi ke asisten sedang bermasalah. Pastikan API Key sudah terpasang!" }]);
+      const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan koneksi.";
+      setMessages(prev => [...prev, { role: 'ai', text: `Waduh: ${errorMessage}` }]);
     } finally {
       setLoading(false);
     }
